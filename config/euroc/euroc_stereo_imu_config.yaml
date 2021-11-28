@@ -10,8 +10,8 @@ image0_topic: "/cam0/image_raw"
 image1_topic: "/cam1/image_raw"
 output_path: "/home/shane/output-result/vins-fusion/"
 
-cam0_calib: "cam0_mei.yaml"
-cam1_calib: "cam1_mei.yaml"
+cam0_calib: "cam0_pinhole_raw.yaml"
+cam1_calib: "cam1_pinhole_raw.yaml"
 image_width: 752
 image_height: 480
    
@@ -44,7 +44,7 @@ multiple_thread: 1
 #feature traker paprameters
 max_cnt: 150            # max feature number in feature tracking
 min_dist: 30            # min distance between two features 
-freq: 10                # frequence (Hz) of publish tracking result. At least 10Hz for good estimation. If set 0, the frequence will be same as raw image 
+freq: 10                # (not work)frequence (Hz) of publish tracking result. At least 10Hz for good estimation. If set 0, the frequence will be same as raw image 
 F_threshold: 1.0        # ransac threshold (pixel)
 show_track: 1           # publish tracking image as topic
 flow_back: 1            # perform forward and backward optical flow to improve feature tracking accuracy
