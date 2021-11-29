@@ -88,6 +88,7 @@ void Estimator::clearState()
     f_manager.clearState();
 
     failure_occur = 0;
+    relocalization_info = 0;
 
     mProcess.unlock();
 }
@@ -313,6 +314,32 @@ void Estimator::processMeasurements()
                         dt = accVector[i].first - accVector[i - 1].first;
                     processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
                 }
+            }
+            // set relocalization frame
+            sensor_msgs::PointCloudConstPtr relo_msg = NULL;
+            while(!relo_buf.empty())
+            {
+                relo_msg = relo_buf.front();
+                relo_buf.pop();
+            }
+            if(relo_msg != NULL)
+            {
+                vector<Vector3d> match_points;
+                double frame_stamp = relo_msg->header.stamp.toSec();
+                for(unsigned int i = 0; i < relo_msg->points.size(); i++)\
+                {
+                    Vector3d norm_xyid;
+                    norm_xyid.x() = relo_msg->points[i].x;
+                    norm_xyid.y() = relo_msg->points[i].y;
+                    norm_xyid.z() = relo_msg->points[i].z;
+                    match_points.push_back(norm_xyid);
+                }
+                Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]);
+                Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]);
+                Matrix3d relo_r = relo_q.toRotationMatrix();
+                int frame_index;
+                frame_index = relo_msg->channels[0].values[7];
+                setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
             }
             mProcess.lock();
             processImage(feature.second, feature.first);
@@ -950,6 +977,10 @@ void Estimator::double2vector()
     if(USE_IMU)
         td = para_Td[0][0];
 
+    if(relocalization_info){
+        relocalization_info = 0;
+    }
+
 }
 
 bool Estimator::failureDetection()
@@ -1109,6 +1140,10 @@ void Estimator::optimization()
 
     ROS_DEBUG("visual measurement count: %d", f_m_cnt);
     //printf("prepare for ceres: %f \n", t_prepare.toc());
+
+    if(relocalization_info){
+        printf("relo_frame_local_index: %d \n",relo_frame_local_index);
+    }
 
     ceres::Solver::Options options;
 
@@ -1608,4 +1643,25 @@ void Estimator::updateLatestStates()
         tmp_gyrBuf.pop();
     }
     mPropagate.unlock();
+}
+
+
+void Estimator::setReloFrame(double _frame_stamp, int _frame_index, vector<Vector3d> &_match_points, Vector3d _relo_t, Matrix3d _relo_r)
+{
+    relo_frame_stamp = _frame_stamp;
+    relo_frame_index = _frame_index;
+    match_points.clear();
+    match_points = _match_points;
+    prev_relo_t = _relo_t;
+    prev_relo_r = _relo_r;
+    for(int i = 0; i < WINDOW_SIZE; i++)
+    {
+        if(relo_frame_stamp == Headers[i])
+        {
+            relo_frame_local_index = i;
+            relocalization_info = 1;
+            for (int j = 0; j < SIZE_POSE; j++)
+                relo_Pose[j] = para_Pose[i][j];
+        }
+    }
 }

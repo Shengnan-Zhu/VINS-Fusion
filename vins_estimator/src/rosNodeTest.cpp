@@ -221,6 +221,14 @@ void cam_switch_callback(const std_msgs::BoolConstPtr &switch_msg)
     return;
 }
 
+void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
+{
+    // printf("relocalization callback! \n");
+    m_buf.lock();
+    estimator.relo_buf.push(points_msg);
+    m_buf.unlock();
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "vins_estimator");
@@ -262,6 +270,7 @@ int main(int argc, char **argv)
         sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
     }
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
+    ros::Subscriber sub_relo_points = n.subscribe("/loop_fusion/match_points", 2000, relocalization_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
     ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
 

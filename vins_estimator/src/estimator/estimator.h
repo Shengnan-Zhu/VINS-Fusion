@@ -19,6 +19,7 @@
 #include <opencv2/core/eigen.hpp>
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
+#include <sensor_msgs/PointCloud.h>
 
 #include "parameters.h"
 #include "feature_manager.h"
@@ -53,6 +54,7 @@ class Estimator
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
+    void setReloFrame(double _frame_stamp, int _frame_index, vector<Vector3d> &_match_points, Vector3d _relo_t, Matrix3d _relo_r);
 
     // internal
     void clearState();
@@ -98,6 +100,7 @@ class Estimator
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
     queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
+    queue<sensor_msgs::PointCloudConstPtr> relo_buf;
     double prevTime, curTime;
     bool openExEstimation;
 
@@ -174,4 +177,15 @@ class Estimator
 
     bool initFirstPoseFlag;
     bool initThreadFlag;
+
+
+    //relocalization variable
+    bool relocalization_info;
+    double relo_frame_stamp;
+    double relo_frame_index;
+    int relo_frame_local_index;
+    vector<Vector3d> match_points;
+    double relo_Pose[SIZE_POSE];
+    Vector3d prev_relo_t;
+    Matrix3d prev_relo_r;
 };
