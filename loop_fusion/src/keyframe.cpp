@@ -498,6 +498,33 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 	    	             relative_yaw;
 	    	//cout << "pnp relative_t " << relative_t.transpose() << endl;
 	    	//cout << "pnp relative_q " << relative_q.w() << " " << relative_q.vec().transpose() << endl;
+			if(FAST_RELOCALIZATION)
+			{
+				sensor_msgs::PointCloud msg_match_points;
+				msg_match_points.header.stamp = ros::Time(time_stamp);
+				for(int i = 0; i < (int)matched_2d_old_norm.size(); i++)
+				{
+					geometry_msgs::Point32 p;
+					p.x = matched_2d_old_norm[i].x;
+					p.y = matched_2d_old_norm[i].y;
+					p.z = matched_id[i];
+					msg_match_points.points.push_back(p);
+				}
+				Eigen::Vector3d T = old_kf->T_w_i;
+				Eigen::Matrix3d R = old_kf->R_w_i;
+			    Quaterniond Q(R);
+			    sensor_msgs::ChannelFloat32 t_q_index;
+			    t_q_index.values.push_back(T.x());
+			    t_q_index.values.push_back(T.y());
+			    t_q_index.values.push_back(T.z());
+			    t_q_index.values.push_back(Q.w());
+			    t_q_index.values.push_back(Q.x());
+			    t_q_index.values.push_back(Q.y());
+			    t_q_index.values.push_back(Q.z());
+			    t_q_index.values.push_back(index);
+			    msg_match_points.channels.push_back(t_q_index);
+			    pub_match_points.publish(msg_match_points);
+			}
 	        return true;
 	    }
 	}
