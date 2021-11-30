@@ -63,8 +63,11 @@ T readParam(ros::NodeHandle &n, std::string name)
     return ans;
 }
 
-void readParameters(std::string config_file)
+void readParameters(ros::NodeHandle &n)
 {
+    std::string config_file;
+    config_file = readParam<std::string>(n, "config_file");
+    printf("vins_node config_file: %s\n", config_file.c_str());
     FILE *fh = fopen(config_file.c_str(),"r");
     if(fh == NULL){
         ROS_WARN("config_file dosen't exist; wrong config_file path");

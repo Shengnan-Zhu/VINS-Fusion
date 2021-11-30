@@ -64,7 +64,7 @@ extern double F_THRESHOLD;
 extern int SHOW_TRACK;
 extern int FLOW_BACK;
 
-void readParameters(std::string config_file);
+void readParameters(ros::NodeHandle &n);
 
 enum SIZE_PARAMETERIZATION
 {

@@ -410,16 +410,19 @@ int main(int argc, char **argv)
     SKIP_CNT = 0;
     SKIP_DIS = 0;
 
-    if(argc != 2)
-    {
-        printf("please intput: rosrun loop_fusion loop_fusion_node [config file] \n"
-               "for example: rosrun loop_fusion loop_fusion_node "
-               "/home/tony-ws1/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml \n");
-        return 0;
-    }
+    // if(argc != 2)
+    // {
+    //     printf("please intput: rosrun loop_fusion loop_fusion_node [config file] \n"
+    //            "for example: rosrun loop_fusion loop_fusion_node "
+    //            "/home/tony-ws1/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml \n");
+    //     return 0;
+    // }
     
-    string config_file = argv[1];
-    printf("config_file: %s\n", argv[1]);
+    // string config_file = argv[1];
+    // printf("config_file: %s\n", argv[1]);
+    string config_file;
+    n.getParam("config_file", config_file);
+    printf("loop_fusion_node config_file: %s\n", config_file.c_str());
 
     cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
     if(!fsSettings.isOpened())
