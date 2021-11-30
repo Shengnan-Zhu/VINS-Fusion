@@ -32,6 +32,7 @@
 #include "../factor/imu_factor.h"
 #include "../factor/pose_local_parameterization.h"
 #include "../factor/marginalization_factor.h"
+#include "../factor/projection_factor.h"
 #include "../factor/projectionTwoFrameOneCamFactor.h"
 #include "../factor/projectionTwoFrameTwoCamFactor.h"
 #include "../factor/projectionOneFrameTwoCamFactor.h"
@@ -100,7 +101,6 @@ class Estimator
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
     queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
-    queue<sensor_msgs::PointCloudConstPtr> relo_buf;
     double prevTime, curTime;
     bool openExEstimation;
 
@@ -188,4 +188,9 @@ class Estimator
     double relo_Pose[SIZE_POSE];
     Vector3d prev_relo_t;
     Matrix3d prev_relo_r;
+    Matrix3d drift_correct_r;
+    Vector3d drift_correct_t;
+    Vector3d relo_relative_t;
+    Quaterniond relo_relative_q;
+    double relo_relative_yaw;
 };

@@ -25,6 +25,7 @@ Estimator estimator;
 
 queue<sensor_msgs::ImuConstPtr> imu_buf;
 queue<sensor_msgs::PointCloudConstPtr> feature_buf;
+queue<sensor_msgs::PointCloudConstPtr> relo_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
@@ -126,6 +127,40 @@ void sync_process()
                 estimator.inputImage(time, image);
         }
 
+        // set relocalization frame
+        sensor_msgs::PointCloudConstPtr relo_msg = NULL;
+        while(!relo_buf.empty())
+        {
+            relo_msg = relo_buf.front();
+            relo_buf.pop();
+        }
+        if(relo_msg != NULL)
+        {
+            vector<Vector3d> match_points;
+            double frame_stamp = relo_msg->header.stamp.toSec();
+            for(unsigned int i = 0; i < relo_msg->points.size(); i++)
+            {
+                Vector3d norm_xyid;
+                norm_xyid.x() = relo_msg->points[i].x;
+                norm_xyid.y() = relo_msg->points[i].y;
+                norm_xyid.z() = relo_msg->points[i].z;
+                match_points.push_back(norm_xyid);
+            }
+            Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]);
+            Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]);
+            estimator.relo_Pose[0] = relo_t.x();
+            estimator.relo_Pose[1] = relo_t.y();
+            estimator.relo_Pose[2] = relo_t.z();
+            estimator.relo_Pose[3] = relo_q.x();
+            estimator.relo_Pose[4] = relo_q.y();
+            estimator.relo_Pose[5] = relo_q.z();
+            estimator.relo_Pose[6] = relo_q.w();
+            Matrix3d relo_r = relo_q.toRotationMatrix();
+            int frame_index;
+            frame_index = relo_msg->channels[0].values[7];
+            estimator.setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
+        }
+
         std::chrono::milliseconds dura(2);
         std::this_thread::sleep_for(dura);
     }
@@ -225,7 +260,7 @@ void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
 {
     // printf("relocalization callback! \n");
     m_buf.lock();
-    estimator.relo_buf.push(points_msg);
+    relo_buf.push(points_msg);
     m_buf.unlock();
 }
 

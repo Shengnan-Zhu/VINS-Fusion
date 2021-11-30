@@ -106,6 +106,7 @@ void Estimator::setParameter()
     ProjectionTwoFrameOneCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     ProjectionTwoFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     ProjectionOneFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
+    ProjectionFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     td = TD;
     g = G;
     cout << "set g " << g.transpose() << endl;
@@ -315,32 +316,7 @@ void Estimator::processMeasurements()
                     processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
                 }
             }
-            // set relocalization frame
-            sensor_msgs::PointCloudConstPtr relo_msg = NULL;
-            while(!relo_buf.empty())
-            {
-                relo_msg = relo_buf.front();
-                relo_buf.pop();
-            }
-            if(relo_msg != NULL)
-            {
-                vector<Vector3d> match_points;
-                double frame_stamp = relo_msg->header.stamp.toSec();
-                for(unsigned int i = 0; i < relo_msg->points.size(); i++)\
-                {
-                    Vector3d norm_xyid;
-                    norm_xyid.x() = relo_msg->points[i].x;
-                    norm_xyid.y() = relo_msg->points[i].y;
-                    norm_xyid.z() = relo_msg->points[i].z;
-                    match_points.push_back(norm_xyid);
-                }
-                Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]);
-                Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]);
-                Matrix3d relo_r = relo_q.toRotationMatrix();
-                int frame_index;
-                frame_index = relo_msg->channels[0].values[7];
-                setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
-            }
+    
             mProcess.lock();
             processImage(feature.second, feature.first);
             prevTime = curTime;
@@ -895,6 +871,7 @@ void Estimator::double2vector()
 {
     Vector3d origin_R0 = Utility::R2ypr(Rs[0]);
     Vector3d origin_P0 = Ps[0];
+    Matrix3d rot_diff;
 
     if (failure_occur)
     {
@@ -911,7 +888,7 @@ void Estimator::double2vector()
                                                           para_Pose[0][5]).toRotationMatrix());
         double y_diff = origin_R0.x() - origin_R00.x();
         //TODO
-        Matrix3d rot_diff = Utility::ypr2R(Vector3d(y_diff, 0, 0));
+        rot_diff = Utility::ypr2R(Vector3d(y_diff, 0, 0));
         if (abs(abs(origin_R0.y()) - 90) < 1.0 || abs(abs(origin_R00.y()) - 90) < 1.0)
         {
             ROS_DEBUG("euler singular point!");
@@ -977,7 +954,21 @@ void Estimator::double2vector()
     if(USE_IMU)
         td = para_Td[0][0];
 
+    // relative info between two loop frame
     if(relocalization_info){
+        Matrix3d relo_r;
+        Vector3d relo_t;
+        relo_r = rot_diff * Quaterniond(relo_Pose[6], relo_Pose[3], relo_Pose[4], relo_Pose[5]).normalized().toRotationMatrix();
+        relo_t = rot_diff * Vector3d(relo_Pose[0] - para_Pose[0][0],
+                                     relo_Pose[1] - para_Pose[0][1],
+                                     relo_Pose[2] - para_Pose[0][2]) + origin_P0;
+        double drift_correct_yaw;
+        drift_correct_yaw = Utility::R2ypr(prev_relo_r).x() - Utility::R2ypr(relo_r).x();
+        drift_correct_r = Utility::ypr2R(Vector3d(drift_correct_yaw, 0, 0));
+        drift_correct_t = prev_relo_t - drift_correct_r * relo_t;
+        relo_relative_t = relo_r.transpose() * (Ps[relo_frame_local_index] - relo_t);
+        relo_relative_q = relo_r.transpose() * Rs[relo_frame_local_index];
+        relo_relative_yaw = Utility::normalizeAngle(Utility::R2ypr(Rs[relo_frame_local_index]).x() - Utility::R2ypr(relo_r).x());
         relocalization_info = 0;
     }
 
@@ -1142,7 +1133,37 @@ void Estimator::optimization()
     //printf("prepare for ceres: %f \n", t_prepare.toc());
 
     if(relocalization_info){
-        printf("relo_frame_local_index: %d \n",relo_frame_local_index);
+        ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
+        problem.AddParameterBlock(relo_Pose, SIZE_POSE, local_parameterization);
+        problem.SetParameterBlockConstant(relo_Pose);
+        int retrive_feature_index = 0;
+        int feature_index = -1;
+        int relo_add_cnt = 0;
+        for(auto &it_per_id : f_manager.feature)
+        {
+            it_per_id.used_num = it_per_id.feature_per_frame.size();
+            if(it_per_id.used_num < 4)
+                continue;
+            ++feature_index;
+            int start = it_per_id.start_frame;
+            if(start <= relo_frame_local_index)
+            {   
+                while((int)match_points[retrive_feature_index].z() < it_per_id.feature_id)
+                {
+                    retrive_feature_index++;
+                }
+                if((int)match_points[retrive_feature_index].z() == it_per_id.feature_id)
+                {
+                    Vector3d pts_j = Vector3d(match_points[retrive_feature_index].x(), match_points[retrive_feature_index].y(), 1.0);
+                    Vector3d pts_i = it_per_id.feature_per_frame[0].point;           
+                    ProjectionFactor *f = new ProjectionFactor(pts_i, pts_j);
+                    problem.AddResidualBlock(f, loss_function, para_Pose[start], relo_Pose, para_Ex_Pose[0], para_Feature[feature_index]);
+                    retrive_feature_index++;
+                    relo_add_cnt++;
+                }     
+            }
+        }
+        // printf("relo_add_cnt %d \n", relo_add_cnt);
     }
 
     ceres::Solver::Options options;
@@ -1163,7 +1184,7 @@ void Estimator::optimization()
     ceres::Solve(options, &problem, &summary);
     //cout << summary.BriefReport() << endl;
     ROS_DEBUG("Iterations : %d", static_cast<int>(summary.iterations.size()));
-    //printf("solver costs: %f \n", t_solver.toc());
+    // printf("solver costs: %f \n", t_solver.toc());
 
     double2vector();
     //printf("frame_count: %d \n", frame_count);
@@ -1660,8 +1681,8 @@ void Estimator::setReloFrame(double _frame_stamp, int _frame_index, vector<Vecto
         {
             relo_frame_local_index = i;
             relocalization_info = 1;
-            for (int j = 0; j < SIZE_POSE; j++)
-                relo_Pose[j] = para_Pose[i][j];
+            // for (int j = 0; j < SIZE_POSE; j++)
+            //     relo_Pose[j] = para_Pose[i][j];
         }
     }
 }
