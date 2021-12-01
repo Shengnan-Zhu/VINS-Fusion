@@ -1,6 +1,7 @@
 ## MY CONTRIBUTIONS
 - Add tightly coupled relocalization module based on sliding window
 - Merge rosrun commands to roslaunch
+- Add loop_closure parameter
 ### Build
 ```
 cd ~/catkin_ws/src
