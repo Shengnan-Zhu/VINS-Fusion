@@ -1,3 +1,23 @@
+## MY CONTRIBUTIONS
+- Add tightly coupled relocalization module based on sliding window
+- Merge rosrun commands to roslaunch
+### Build
+```
+cd ~/catkin_ws/src
+git clone git@github.com:Shengnan-Zhu/VINS-Fusion.git
+cd ../
+catkin_make
+source ~/catkin_ws/devel/setup.bash
+```
+### Stereo + Imu (EuRoC)
+```
+roslaunch vins vins_rviz.launch
+roslaunch vins euroc_stereo_imu.launch
+rosbag play YOUR_DATASET_FOLDER/MH_01_easy.bag
+```
+ 
+
+ 
 # VINS-Fusion
 ## An optimization-based multi-sensor state estimator
 
