@@ -57,6 +57,7 @@ int ROW;
 int COL;
 int DEBUG_IMAGE;
 int FAST_RELOCALIZATION;
+int LOOP_CLOSURE;
 
 camodocal::CameraPtr m_camera;
 Eigen::Vector3d tic;
@@ -77,6 +78,8 @@ ros::Publisher pub_point_cloud, pub_margin_cloud;
 
 void new_sequence()
 {
+    if(!LOOP_CLOSURE)
+        return;
     printf("new sequence\n");
     sequence++;
     printf("sequence cnt %d \n", sequence);
@@ -101,6 +104,8 @@ void new_sequence()
 
 void image_callback(const sensor_msgs::ImageConstPtr &image_msg)
 {
+    if(!LOOP_CLOSURE)
+        return;
     //ROS_INFO("image_callback!");
     m_buf.lock();
     image_buf.push(image_msg);
@@ -120,6 +125,8 @@ void image_callback(const sensor_msgs::ImageConstPtr &image_msg)
 
 void point_callback(const sensor_msgs::PointCloudConstPtr &point_msg)
 {
+    if(!LOOP_CLOSURE)
+        return;
     //ROS_INFO("point_callback!");
     m_buf.lock();
     point_buf.push(point_msg);
@@ -156,6 +163,8 @@ void point_callback(const sensor_msgs::PointCloudConstPtr &point_msg)
 // only for visualization
 void margin_point_callback(const sensor_msgs::PointCloudConstPtr &point_msg)
 {
+    if(!LOOP_CLOSURE)
+        return;
     sensor_msgs::PointCloud point_cloud;
     point_cloud.header = point_msg->header;
     for (unsigned int i = 0; i < point_msg->points.size(); i++)
@@ -176,6 +185,8 @@ void margin_point_callback(const sensor_msgs::PointCloudConstPtr &point_msg)
 
 void pose_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 {
+    if(!LOOP_CLOSURE)
+        return;
     //ROS_INFO("pose_callback!");
     m_buf.lock();
     pose_buf.push(pose_msg);
@@ -193,6 +204,8 @@ void pose_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 
 void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 {
+    if(!LOOP_CLOSURE)
+        return;
     //ROS_INFO("vio_callback!");
     Vector3d vio_t(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y, pose_msg->pose.pose.position.z);
     Quaterniond vio_q;
@@ -233,6 +246,8 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 
 void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 {
+    if(!LOOP_CLOSURE)
+        return;
     m_process.lock();
     tic = Vector3d(pose_msg->pose.pose.position.x,
                    pose_msg->pose.pose.position.y,
@@ -246,6 +261,8 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 
 void process()
 {
+    if(!LOOP_CLOSURE)
+        return;
     while (true)
     {
         sensor_msgs::ImageConstPtr image_msg = NULL;
@@ -379,6 +396,8 @@ void process()
 
 void command()
 {
+    if(!LOOP_CLOSURE)
+        return;
     while(1)
     {
         char c = getchar();
@@ -433,56 +452,65 @@ int main(int argc, char **argv)
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
 
+    LOOP_CLOSURE = fsSettings["loop_closure"];
+
     std::string IMAGE_TOPIC;
     int LOAD_PREVIOUS_POSE_GRAPH;
 
-    ROW = fsSettings["image_height"];
-    COL = fsSettings["image_width"];
-    std::string pkg_path = ros::package::getPath("loop_fusion");
-    string vocabulary_file = pkg_path + "/../support_files/brief_k10L6.bin";
-    cout << "vocabulary_file" << vocabulary_file << endl;
-    posegraph.loadVocabulary(vocabulary_file);
+    if(LOOP_CLOSURE)
+    {
+        ROW = fsSettings["image_height"];
+        COL = fsSettings["image_width"];
+        std::string pkg_path = ros::package::getPath("loop_fusion");
+        string vocabulary_file = pkg_path + "/../support_files/brief_k10L6.bin";
+        cout << "vocabulary_file" << vocabulary_file << endl;
+        posegraph.loadVocabulary(vocabulary_file);
 
-    BRIEF_PATTERN_FILE = pkg_path + "/../support_files/brief_pattern.yml";
-    cout << "BRIEF_PATTERN_FILE" << BRIEF_PATTERN_FILE << endl;
+        BRIEF_PATTERN_FILE = pkg_path + "/../support_files/brief_pattern.yml";
+        cout << "BRIEF_PATTERN_FILE" << BRIEF_PATTERN_FILE << endl;
 
-    int pn = config_file.find_last_of('/');
-    std::string configPath = config_file.substr(0, pn);
-    std::string cam0Calib;
-    fsSettings["cam0_calib"] >> cam0Calib;
-    std::string cam0Path = configPath + "/" + cam0Calib;
-    printf("cam calib path: %s\n", cam0Path.c_str());
-    m_camera = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(cam0Path.c_str());
+        int pn = config_file.find_last_of('/');
+        std::string configPath = config_file.substr(0, pn);
+        std::string cam0Calib;
+        fsSettings["cam0_calib"] >> cam0Calib;
+        std::string cam0Path = configPath + "/" + cam0Calib;
+        printf("cam calib path: %s\n", cam0Path.c_str());
+        m_camera = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(cam0Path.c_str());
 
-    fsSettings["image0_topic"] >> IMAGE_TOPIC;        
-    fsSettings["pose_graph_save_path"] >> POSE_GRAPH_SAVE_PATH;
-    fsSettings["output_path"] >> VINS_RESULT_PATH;
-    fsSettings["save_image"] >> DEBUG_IMAGE;
+        fsSettings["image0_topic"] >> IMAGE_TOPIC;        
+        fsSettings["pose_graph_save_path"] >> POSE_GRAPH_SAVE_PATH;
+        fsSettings["output_path"] >> VINS_RESULT_PATH;
+        fsSettings["save_image"] >> DEBUG_IMAGE;
 
-    LOAD_PREVIOUS_POSE_GRAPH = fsSettings["load_previous_pose_graph"];
-    FAST_RELOCALIZATION = fsSettings["fast_relocalization"];
-    VINS_RESULT_PATH = VINS_RESULT_PATH + "/vio_loop.csv";
-    std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
-    fout.close();
+        LOAD_PREVIOUS_POSE_GRAPH = fsSettings["load_previous_pose_graph"];
+        FAST_RELOCALIZATION = fsSettings["fast_relocalization"];
+        VINS_RESULT_PATH = VINS_RESULT_PATH + "/vio_loop.csv";
+        std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
+        fout.close();
 
-    int USE_IMU = fsSettings["imu"];
-    posegraph.setIMUFlag(USE_IMU);
+        int USE_IMU = fsSettings["imu"];
+        posegraph.setIMUFlag(USE_IMU);
+        fsSettings.release();
+
+        if (LOAD_PREVIOUS_POSE_GRAPH)
+        {
+            printf("load pose graph\n");
+            m_process.lock();
+            posegraph.loadPoseGraph();
+            m_process.unlock();
+            printf("load pose graph finish\n");
+            load_flag = 1;
+        }
+        else
+        {
+            printf("no previous pose graph\n");
+            load_flag = 1;
+        }
+    }
+
     fsSettings.release();
 
-    if (LOAD_PREVIOUS_POSE_GRAPH)
-    {
-        printf("load pose graph\n");
-        m_process.lock();
-        posegraph.loadPoseGraph();
-        m_process.unlock();
-        printf("load pose graph finish\n");
-        load_flag = 1;
-    }
-    else
-    {
-        printf("no previous pose graph\n");
-        load_flag = 1;
-    }
+    
 
     ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 2000, vio_callback);
     ros::Subscriber sub_image = n.subscribe(IMAGE_TOPIC, 2000, image_callback);
