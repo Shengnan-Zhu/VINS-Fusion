@@ -136,7 +136,7 @@ class Estimator
 
     int frame_count;
     int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;
-    // int inputImageCnt;
+    int inputImageCnt;
 
     FeatureManager f_manager;
     MotionEstimator m_estimator;

@@ -265,8 +265,12 @@ bool Estimator::IMUAvailable(double t)
 {
     if(!accBuf.empty() && t <= accBuf.back().first)
         return true;
-    else
+    else{
+        // if(t > accBuf.back().first)
+        //     printf("t: %f, accBuf.back(): %f \n", t, accBuf.back().first);
         return false;
+    }
+        
 }
 
 void Estimator::processMeasurements()
@@ -286,7 +290,7 @@ void Estimator::processMeasurements()
                     break;
                 else
                 {
-                    printf("wait for imu ... \n");
+                    // printf("wait for imu ... \n");
                     if (! MULTIPLE_THREAD)
                         return;
                     std::chrono::milliseconds dura(5);

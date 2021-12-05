@@ -1,0 +1,12 @@
+<launch>
+    <arg name="config_path" default = "$(find vins)/../config/mynteye-s/mynteye_stereo_imu_config.yaml" />
+
+    <node name="vins_estimator" pkg="vins" type="vins_node" output="screen">
+       <param name="config_file" type="string" value="$(arg config_path)" />
+    </node>
+
+    <node name="loop_fusion" pkg="loop_fusion" type="loop_fusion_node" output="screen">
+        <param name="config_file" type="string" value="$(arg config_path)" />
+    </node>
+
+</launch>

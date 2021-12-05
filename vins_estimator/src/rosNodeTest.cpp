@@ -298,11 +298,11 @@ int main(int argc, char **argv)
         sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     }
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
-    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
+    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 1000, img0_callback);
     ros::Subscriber sub_img1;
     if(STEREO)
     {
-        sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
+        sub_img1 = n.subscribe(IMAGE1_TOPIC, 1000, img1_callback);
     }
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_relo_points = n.subscribe("/loop_fusion/match_points", 2000, relocalization_callback);
